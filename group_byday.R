@@ -3,13 +3,6 @@ library(reshape)
 
 data <- read_csv("combined_bicycle_weather_data.csv")
 
-# What is the relationship between the number of bike users in a given day and weather conditions such as temperature,
-# wind speed and humidity?
-# - Group by day.
-# - Explore relationship between (1) number of bikes in a day and (2) total distance travelled and (3)
-# usage duration by all users and other variables.
-# - Explore normalizing weather variables - is it more predictive?
-
 # Group by day and add summary columns (count registered and casual users, total distance, total duration)
 by_day <- data %>% 
   group_by(Date) %>% 
@@ -28,8 +21,7 @@ sum((by_day$Registered.Users+by_day$Casual.Users)==by_day$Bike.Count)
 weather <- read_csv("2017_Q1_weather.csv")
 byday_data <- merge(x = by_day, y = weather, by = "Date", all.x=TRUE)
 
-# Run this line twice:
-byday_data$Condition <- sub(",", " ", byday_data$Condition, fixed=TRUE)
+byday_data$Condition <- gsub(",", " ", byday_data$Condition, fixed=TRUE)
 
 # Make conditions indicators (0 or 1)
 conditions <- byday_data %>% 
@@ -60,4 +52,3 @@ byday_final <- byday_data %>%
 
 # Write to CSV for safekeeping
 write_csv(byday_final, "byday_final.csv")
-
