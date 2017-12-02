@@ -68,7 +68,7 @@ by_day <- by_day %>%
 
 # Add day of week and Is.Weekend variables
 by_day$Weekday <- weekdays(by_day$Date)
-by_day$Is.Weekend <- by_day$Weekday=="Sunday"||by_day$Weekday=="Saturday"
+by_day$Is.Weekend <- by_day$Weekday=="Sunday"|by_day$Weekday=="Saturday"
 
 # In Rain_Inches, T stands for "Trace", which means that some moisture was detected, but not enough to be
 # measurable. We will impute T as 0.
