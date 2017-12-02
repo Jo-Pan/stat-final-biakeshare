@@ -3,6 +3,9 @@ library(car) #step
 library(MASS) #box-cox
 library(DAAG) #cv
 
+##################################
+#  Predict bike share count      #
+##################################
 # Data Preprocess for models ----------------------------------------------------
 day<-read.csv("by_day.csv")
 hour<-read.csv("by_hour.csv")
@@ -271,3 +274,184 @@ s.cv <- cv.lm(data=data, form.lm=lm.step3, m=2, plotit=T)
 # ms 2033546 
 
 # plot shows our final model (lm.step3) is pretty good.
+
+
+##################################
+#  Predict total travel distance #
+##################################
+outcomeName<-"Total.Dist" 
+predictorName<-names(day)[8:33]
+data=data.frame(day[,predictorName],day[,outcomeName])
+names(data)[27]<-outcomeName
+
+# Linear Model (full) ----------------------------------------------------
+lm.full<-lm(Total.Dist~.,data=data)
+summary(lm.full) 
+# Call:
+#   lm(formula = Total.Dist ~ ., data = data)
+# 
+# Residuals:
+#   Min       1Q   Median       3Q      Max 
+# -4142751 -1420799  -275112  1264260  7387941 
+# 
+# Coefficients: (2 not defined because of singularities)
+# Estimate Std. Error t value Pr(>|t|)   
+# (Intercept)      -32786519   49368100   -0.66   0.5092   
+# MonthJan          -1477401     904751   -1.63   0.1078   
+# MonthMarch          326644     923584    0.35   0.7248   
+# Day                  76872      40983    1.88   0.0656 . 
+# Temp_High            71919     593249    0.12   0.9039   
+# Temp_Avg            402676    1200287    0.34   0.7385   
+# Temp_Low              1236     608885    0.00   0.9984   
+# Dew_High              3301     133736    0.02   0.9804   
+# Dew_Avg            -110198     196993   -0.56   0.5780   
+# Dew_Low              61578     119715    0.51   0.6089   
+# Hum_High            -70601      87740   -0.80   0.4242   
+# Hum_Avg             112558     155900    0.72   0.4732   
+# Hum_Low             -30562      71239   -0.43   0.6695   
+# Pres_High          1899766    8195961    0.23   0.8175   
+# Pres_Avg          -2318561   14876266   -0.16   0.8767   
+# Pres_Low           1328079    8604694    0.15   0.8779   
+# Vis_High                NA         NA      NA       NA   
+# Vis_Avg             -31776     618062   -0.05   0.9592   
+# Vis_Low             267522     223886    1.19   0.2369   
+# Wind_Avg           -199183      87521   -2.28   0.0265 * 
+#   Rain_Inches       -7754751    2604341   -2.98   0.0042 **
+#   Rain               -820842    1022358   -0.80   0.4253   
+# Fog                 715457    1663492    0.43   0.6687   
+# Snow               3046881    1336248    2.28   0.0262 * 
+#   Thunderstorm        165294    2978387    0.06   0.9559   
+# WeekdayMonday       702456    1204993    0.58   0.5621   
+# WeekdaySaturday    -267159    1204318   -0.22   0.8252   
+# WeekdaySunday     -3888304    1132643   -3.43   0.0011 **
+#   WeekdayThursday    -117794    1164422   -0.10   0.9198   
+# WeekdayTuesday     -601175    1201452   -0.50   0.6187   
+# WeekdayWednesday     97222    1217645    0.08   0.9366   
+# Is.Weekend              NA         NA      NA       NA   
+# Is.Holiday        -4428662    1716542   -2.58   0.0124 * 
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 2630000 on 59 degrees of freedom
+# Multiple R-squared:  0.872,	Adjusted R-squared:  0.807 
+# F-statistic: 13.4 on 30 and 59 DF,  p-value: <2e-16
+
+#remove is.weekend and Vis_High
+predictorName<-predictorName[-c(15,25)]
+data=data.frame(day[,predictorName],day[,outcomeName])
+names(data)[25]<-outcomeName
+
+lm.full2<-lm(Total.Dist~.,data=data)
+summary(lm.full2) 
+
+lm.full3<-lm(Total.Dist~.-Month,data=data)
+summary(lm.full2) 
+
+# Step function -----------------------------------------------------------------
+## Begin by defining the models with no variables (null) and all variables (full)
+lm.null <- lm(Total.Dist~0,data=data)
+
+#### step selection 1
+lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full3), direction="both")
+#Step:  AIC=2665
+# Total.Dist ~ Rain_Inches + Weekday + Is.Holiday + Day + Vis_Low + 
+#   Wind_Avg + Snow + Temp_Avg + Hum_High - 1
+
+vif(lm.step) #there are some high vif
+
+#### step selection 2
+# step without high vif variables
+lm.full4<-lm(Total.Dist~.-Month-Hum_High,data=data)
+lm.step2<-step(lm.null, scope=list(lower=lm.null, upper=lm.full4), direction="both")
+# Step:  AIC=2665
+# Total.Dist ~ Rain_Inches + Weekday + Is.Holiday + Day + Vis_Low + 
+#   Wind_Avg + Snow + Temp_Avg + Dew_High - 1
+
+vif(lm.step2) #temp avg is very high
+
+#### step selection 3
+lm.step3<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_Avg,data=data)
+                                   ), direction="both")
+
+vif(lm.step3) #temp low and dew high are very high
+
+#### step selection 4
+lm.step4<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_Avg-Temp_Low-Dew_High,data=data)
+                ), direction="both")
+vif(lm.step4) #temp_high is very high
+
+
+#### step selection 5
+lm.step5<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_High-Temp_Avg-Temp_Low-Dew_High,data=data)
+), direction="both")
+vif(lm.step5) 
+
+#### step selection 6
+lm.step6<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Temp_High-Temp_Avg-Temp_Low-Dew_High,data=data)
+), direction="both")
+vif(lm.step6) 
+
+#### step selection 7
+lm.step7<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg,data=data)
+), direction="both")
+vif(lm.step7) 
+
+#### step selection 8
+lm.step8<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg,data=data)
+), direction="both")
+vif(lm.step8) 
+
+#### step selection 9
+lm.step9<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg-Vis_Avg,data=data)
+), direction="both")
+vif(lm.step9) 
+
+#### step selection 10
+lm.step10<-step(lm.null, scope=list(lower=lm.null, 
+                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg-Vis_Avg-Vis_Low,data=data)
+), direction="both")
+#Total.Dist ~ Weekday + Dew_Low + Rain_Inches + Is.Holiday + Day - 1
+  
+vif(lm.step10)  #all below 5
+
+# residuals analysis ----------------------------------------------
+## Find the residuals
+ei<-resid(lm.step10)
+
+## Find the studentized residuals
+ri<-rstandard(lm.step10)
+
+## Find the R-student residuals
+ti<-rstudent(lm.step10)
+
+## Normal probabilty plot : most points look normal. except right tail
+qqnorm(rstudent(lm.step10))
+qqline(rstudent(lm.step10))
+
+## Residual plot vs. fitted values : most points look normal.  there are 2 exception
+yhat <- fitted(lm.step10)
+plot(yhat,ti)
+
+summary(influence.measures(lm.step10))
+#84,51 & 90 are an influential points.
+
+## plot against individual explainatory variable
+#Total.Dist ~ Weekday + Dew_Low + Rain_Inches + Is.Holiday + Day 
+plot(data$Dew_Low,ti) #mostly normal
+plot(data$Rain_Inches,ti) #not normal!
+plot(data$Day,ti) #kind of normal 
+
+# cross validate -----------------------------------------------
+s.cv <- cv.lm(data=data, form.lm=lm.step10, m=2, plotit=T) 
+#Sum of squares = 1.08e+15    Mean square = 2.4e+13    n = 45 
+# Overall (Sum over all 45 folds) 
+# ms  1.82e+13 
+
+# plot shows our final model (lm.step3) is  good.
