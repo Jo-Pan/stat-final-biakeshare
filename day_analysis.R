@@ -1,6 +1,6 @@
-library(car) #step
 library(MASS) #box-cox
 library(DAAG) #cv
+library(car) #step
 library(tidyverse)
 
 ###########################################
@@ -76,7 +76,7 @@ bikedata$Pres_Range <- bikedata$Pres_High-bikedata$Pres_Low
 bikedata$Vis_Range <- bikedata$Vis_High-bikedata$Vis_Low
 
 # Drop and High and Low variables. We will also drop Is.Weekend because it is perfectly linearly
-# depend with Weekday==Saturday and Weekday==Sunday.
+# dependent with Weekday==Saturday and Weekday==Sunday.
 
 bikedata <- bikedata %>% 
   select(-Is.Weekend, -Temp_High, -Temp_Low, -Dew_High, -Dew_Low, -Hum_High, -Hum_Low,
@@ -128,7 +128,7 @@ bikedata <- bikedata %>%
 
 lm.full4 <- lm(Bike.Count~.,data=bikedata)
 
-# Step function -----------------------------------------------------------------
+# Stepwise/Foward/Backward Selection -----------------------------------------------------------------
 
 ## Begin by defining the models with no variables (null) and all variables (full)
 lm.null <- lm(Bike.Count~1,data=bikedata)
@@ -146,6 +146,25 @@ summary(lm.step)
 # F-statistic: 28.43 on 16 and 73 DF,  p-value: < 2.2e-16
 
 # Model is significant.
+
+# Forward selection:
+lm.forward <- step(lm.null, scope=list(lower=lm.null, upper=lm.full4), direction="forward")
+summary(lm.forward)
+
+# Step:  AIC=1281.19
+# Bike.Count ~ Temp_Avg + Hum_Avg + Rain_Inches + Weekday + Is.Holiday + 
+#   Wind_Avg + Month + Day + Snow + Rain
+
+# Forward selection picked the exact same model.
+
+# Backward elimination:
+lm.back <- step(lm.full4, scope=list(lower=lm.null, upper=lm.full4), direction="backward")
+
+# Step:  AIC=1281.19
+# Bike.Count ~ Month + Day + Temp_Avg + Hum_Avg + Wind_Avg + Rain_Inches + 
+#   Rain + Snow + Weekday + Is.Holiday
+
+# Backward elimination also picked the exact same model.
 
 # Residual Analysis/Influential Points ----------------------------------------------
 
@@ -244,69 +263,53 @@ x.cv <- cv.lm(data=bikedata, form.lm=lm.step, m=2, plotit=T)
 # Plot shows our final model is pretty good.
 
 #######################################################
-## LINEAR MODELING: PREDICTING TOTAL TRAVEL DISTANCE
+## LINEAR MODELING: PREDICTING DAILY TOTAL DISTANCE
 #######################################################
 
-bikedata2 <- bikedata %>% select(-Bike.Count)
-bikedata2$Total.Dist <- day$Total.Dist
+plot(day$Bike.Count, day$Total.Dist)
 
-# Linear Model (full) ----------------------------------------------------
+# We thought we would make a separating model predicting total distance travelled by all bikeshare
+# users on a given day, but the plot above shows that BikeCount and Total.Dist are very highly
+# correlated. A model predicting Total.Dist would use the exact same preidctors as the model above.
 
-lm.full<-lm(Total.Dist~.,data=bikedata2)
-summary(lm.full) 
+#######################################################
+## LINEAR MODELING: PREDICTING HOURLY BIKE COUNT
+#######################################################
 
-# Residual standard error: 2590000 on 64 degrees of freedom
-# Multiple R-squared:  0.866,	Adjusted R-squared:  0.813 
-# F-statistic: 16.5 on 25 and 64 DF,  p-value: <2e-16
+by_hour <- hour %>% 
+  group_by(Date, Start.Hour) %>% 
+  summarise(Bike.Count = n())
+
+by_hour$Start.Hour <- as.factor(by_hour$Start.Hour)
+
+plot(by_hour$Start.Hour, by_hour$Bike.Count)
+
+predicted <- data.frame(Date = day$Date, Predicted.BC = fitted(lm.step)/24)
+
+by_hour <- merge(x = by_hour, y = predicted, by = "Date", all.x=TRUE)
+
+by_hour$Predicted.Residual <- by_hour$Bike.Count - by_hour$Predicted.BC
+
+hour.lm <- lm(Predicted.Residual ~ Start.Hour, data=by_hour)
+summary(hour.lm)
+
+# Residual standard error: 177 on 2119 degrees of freedom
+# Multiple R-squared:  0.641,	Adjusted R-squared:  0.637 
+# F-statistic:  164 on 23 and 2119 DF,  p-value: <2e-16
 
 # Model is significant.
-# Month, Day, Temp_Avg, Wind_Avg, Rain_Inches, Snow, Weekday, Is.Holiday 
-# appear to be statistically significant predictors.
 
-# Step function -----------------------------------------------------------------
-## Begin by defining the models with no variables (null) and all variables (full)
-lm.null <- lm(Total.Dist~1,data=bikedata2)
-
-#### step selection
-lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full), direction="both")
-# Step:  AIC=2664
-# Total.Dist ~ Temp_Avg + Rain_Inches + Weekday + Is.Holiday + 
-#   Wind_Avg + Day + Month + Snow + Rain
-
-summary(lm.step)
-# Residual standard error: 2470000 on 74 degrees of freedom
-# Multiple R-squared:  0.859,	Adjusted R-squared:  0.83 
-# F-statistic:   30 on 15 and 74 DF,  p-value: <2e-16
-
-vif(lm.step)
-# All VIF < 2.
-
-# Residual Analysis ----------------------------------------------
-
-## Find the R-student residuals
-ti<-rstudent(lm.step)
+# Residual analysis:
+hour.ti<-rstudent(hour.lm)
 
 ## Normal probabilty plot
-qqnorm(ti)
-qqline(ti)
-# Looks good apart from 2 points in the right tail.
+qqnorm(hour.ti)
+qqline(hour.ti)
+# The points in the middle are fine but the tails are extremely heavy and strange.
 
-## Residual plot vs. fitted values
-plot(fitted(lm.step), ti)
-# Mostly fine except for 2 outliers.
+## Residual vs. fitted values plot
+plot(fitted(hour.lm),hour.ti)
+# Highly abnormal.
 
-## Plot against individual explanatory variable
-plot(bikedata2$Temp_Avg, ti)
-plot(bikedata2$Rain_Inches, ti)
-plot(bikedata2$Wind_Avg, ti)
+plot(as.numeric(by_hour$Start.Hour), by_hour$Predicted.Residual)
 
-# The plots are all similar to the ones in the Bike.Count model.
-
-# Cross-Validate -----------------------------------------------
-s.cv <- cv.lm(data=bikedata2, form.lm=lm.step, m=2, plotit=T) 
-
-# Sum of squares = 5.72e+14    Mean square = 1.27e+13    n = 45 
-# 
-# Overall (Sum over all 45 folds) 
-# ms 
-# 1.1e+13
