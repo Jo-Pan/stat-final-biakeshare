@@ -1,457 +1,312 @@
-#setwd("/Users/Pan/Google Drive/Data Science/STAT 6021/stat-final-bikeshare")
 library(car) #step
 library(MASS) #box-cox
 library(DAAG) #cv
+library(tidyverse)
 
-##################################
-#  Predict bike share count      #
-##################################
-# Data Preprocess for models ----------------------------------------------------
+###########################################
+## LINEAR MODELING: PREDICTING BIKE COUNT
+###########################################
+
+# Data Preprocessing ----------------------------------------------------
 day<-read.csv("by_day.csv")
 hour<-read.csv("by_hour.csv")
 
-day$Is.Weekend<-as.numeric(grepl("S(at|un)", day$Weekday))
+# Treat categorical variables as factors
+day$Is.Weekend<-as.factor(day$Is.Weekend)
 day$Month<-as.factor(day$Month)
 day$Weekday<-as.factor(day$Weekday)
+day$Rain <- as.factor(day$Rain)
+day$Fog <- as.factor(day$Fog)
+day$Snow <- as.factor(day$Snow)
+day$Thunderstorm <- as.factor(day$Thunderstorm)
 
-outcomeName<-"Bike.Count" 
-predictorName<-names(day)[8:33]
-data=data.frame(day[,predictorName],day[,outcomeName])
-names(data)[27]<-outcomeName
+# Subset variables we're interested in
+bikedata <- day[, c(2, 8:33)]
 
-colSums(is.na(data))
-
-
+# Investigate NAs
+colSums(is.na(bikedata))
+# There are no NAs.
 
 # Linear Model (full) ----------------------------------------------------
-lm.full<-lm(Bike.Count~.,data=data)
+
+lm.full<-lm(Bike.Count~.,data=bikedata)
+
 summary(lm.full) 
-# Residuals:
-#   Min      1Q  Median      3Q     Max 
-# -1921.7  -638.7  -233.7   586.8  3268.1 
-# 
-# Coefficients: (2 not defined because of singularities)
-# Estimate Std. Error t value Pr(>|t|)   
-# (Intercept)      -14975.941  22626.341  -0.662  0.51062   
-# MonthJan           -687.628    414.665  -1.658  0.10257   
-# MonthMarch          243.167    423.296   0.574  0.56784   
-# Day                  33.981     18.783   1.809  0.07553 . 
-# Temp_High            49.199    271.897   0.181  0.85703   
-# Temp_Avg            159.389    550.114   0.290  0.77303   
-# Temp_Low              8.991    279.063   0.032  0.97441   
-# Dew_High             12.634     61.294   0.206  0.83740   
-# Dew_Avg             -84.069     90.286  -0.931  0.35557   
-# Dew_Low              47.188     54.868   0.860  0.39326   
-# Hum_High            -31.431     40.213  -0.782  0.43757   
-# Hum_Avg              56.827     71.452   0.795  0.42961   
-# Hum_Low             -22.751     32.650  -0.697  0.48866   
-# Pres_High           579.132   3756.365   0.154  0.87800   
-# Pres_Avg          -1339.090   6818.076  -0.196  0.84497   
-# Pres_Low           1175.121   3943.695   0.298  0.76677   
-# Vis_High                 NA         NA      NA       NA   
-# Vis_Avg              88.952    283.269   0.314  0.75461   
-# Vis_Low              97.284    102.611   0.948  0.34696   
-# Wind_Avg            -86.376     40.112  -2.153  0.03539 * 
-#   Rain_Inches       -3252.357   1193.619  -2.725  0.00845 **
-#   Rain               -432.363    468.566  -0.923  0.35990   
-# Fog                 607.560    762.410   0.797  0.42871   
-# Snow               1201.443    612.428   1.962  0.05451 . 
-# Thunderstorm        540.906   1365.051   0.396  0.69335   
-# WeekdayMonday       147.423    552.271   0.267  0.79045   
-# WeekdaySaturday    -268.785    551.962  -0.487  0.62809   
-# WeekdaySunday     -1748.884    519.112  -3.369  0.00133 **
-# WeekdayThursday    -220.331    533.677  -0.413  0.68121   
-# WeekdayTuesday     -248.911    550.648  -0.452  0.65290   
-# WeekdayWednesday   -129.384    558.070  -0.232  0.81746   
-# Is.Weekend               NA         NA      NA       NA   
-# Is.Holiday        -1743.461    786.724  -2.216  0.03055 * 
-#   ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
+
 # Residual standard error: 1206 on 59 degrees of freedom
 # Multiple R-squared:  0.8735,	Adjusted R-squared:  0.8092 
 # F-statistic: 13.59 on 30 and 59 DF,  p-value: < 2.2e-16
 
-#remove is.weekend and Vis_High
-predictorName<-predictorName[-c(15,25)]
-data=data.frame(day[,predictorName],day[,outcomeName])
-names(data)[25]<-outcomeName
+# Model is significant.
 
-lm.full2<-lm(Bike.Count~.,data=data)
-summary(lm.full2) 
-# Coefficients:
-#   Estimate Std. Error t value Pr(>|t|)   
-# (Intercept)      -14975.941  22626.341  -0.662  0.51062   
-# MonthJan           -687.628    414.665  -1.658  0.10257   
-# MonthMarch          243.167    423.296   0.574  0.56784   
-# Day                  33.981     18.783   1.809  0.07553 . 
-# Temp_High            49.199    271.897   0.181  0.85703   
-# Temp_Avg            159.389    550.114   0.290  0.77303   
-# Temp_Low              8.991    279.063   0.032  0.97441   
-# Dew_High             12.634     61.294   0.206  0.83740   
-# Dew_Avg             -84.069     90.286  -0.931  0.35557   
-# Dew_Low              47.188     54.868   0.860  0.39326   
-# Hum_High            -31.431     40.213  -0.782  0.43757   
-# Hum_Avg              56.827     71.452   0.795  0.42961   
-# Hum_Low             -22.751     32.650  -0.697  0.48866   
-# Pres_High           579.132   3756.365   0.154  0.87800   
-# Pres_Avg          -1339.090   6818.076  -0.196  0.84497   
-# Pres_Low           1175.121   3943.695   0.298  0.76677   
-# Vis_Avg              88.952    283.269   0.314  0.75461   
-# Vis_Low              97.284    102.611   0.948  0.34696   
-# Wind_Avg            -86.376     40.112  -2.153  0.03539 * 
-#   Rain_Inches       -3252.357   1193.619  -2.725  0.00845 **
-#   Rain               -432.363    468.566  -0.923  0.35990   
-# Fog                 607.560    762.410   0.797  0.42871   
-# Snow               1201.443    612.428   1.962  0.05451 . 
-# Thunderstorm        540.906   1365.051   0.396  0.69335   
-# WeekdayMonday       147.423    552.271   0.267  0.79045   
-# WeekdaySaturday    -268.785    551.962  -0.487  0.62809   
-# WeekdaySunday     -1748.884    519.112  -3.369  0.00133 **
-#   WeekdayThursday    -220.331    533.677  -0.413  0.68121   
-# WeekdayTuesday     -248.911    550.648  -0.452  0.65290   
-# WeekdayWednesday   -129.384    558.070  -0.232  0.81746   
-# Is.Holiday        -1743.461    786.724  -2.216  0.03055 * 
-#   ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# Residual standard error: 1206 on 59 degrees of freedom
-# Multiple R-squared:  0.8735,	Adjusted R-squared:  0.8092 
-# F-statistic: 13.59 on 30 and 59 DF,  p-value: < 2.2e-16
+# The model identified Day, Wind_Avg, Rain_Inches, Snow, Weekday(Sunday) and Is.Holiday
+# as significant variables at the 5% significance level.
+# Is.Weekend and Vis_High were removed from the model because of singularities.
 
+# We do not know if the beta estimates above are being affected by multicollinearity.
+# We need to investigate multicollinearity in the data and consider transforming
+# and removing variables.
 
-# Step function -----------------------------------------------------------------
-## Begin by defining the models with no variables (null) and all variables (full)
-lm.null <- lm(Bike.Count~0,data=data)
+# Investigate Multicollinearity --------------------------------------------------------------------------
 
-## step selection
-lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full2), direction="both")
-
-# Step:  AIC=1278.94
-# Bike.Count ~ Temp_High + Rain_Inches + Month + Day + Rain + Weekday + 
-#   Wind_Avg + Is.Holiday + Temp_Low + Snow + Vis_Low - 1
-
-# Investigate correlation --------------------------------------------------------------------------
-is.num <- sapply(data, is.numeric)
-num.df <- data[, is.num]
+# Look at correlation matrix between numeric variables
+is.num <- sapply(bikedata, is.numeric)
+num.df <- bikedata[, is.num]
 cor(num.df)
 
-vif(lm.full2) # a lot of them above 5
-vif(lm.step) #temphigh and templow >5
+# There are severe near-linear dependencies (corr > 0.9) between Temp_High and Temp_Avg,
+# Temp_Low and Temp_Avg, Dew_High and Dew_Avg, Dew_Low and Dew_Avg, Hum_High and Hum_Avg,
+# Pres_High and Pres_Avg, and Pres_Low and Pres_Avg.
 
+# Look at Variance Inflation Factors
+lm.full<-lm(Bike.Count~.-Is.Weekend -Vis_High,data=bikedata)
+vif(lm.full)
+# Again, many of weather variables have VIF > 5, so again, we need to deal with them.
 
-# Step function without high vif variable ---------------------------------------
-lm.full3<-lm(Bike.Count~.-Temp_High - Hum_Avg - Pres_Avg,data=data)
+# Dealing With Multicollinearity --------------------------------------------------------------------------
+
+# Collapse High/Low Variables into Range Variables.
+# This way, we keep the information contained in these variables and hopefully avoid multicollinearity
+# with the Avg.
+
+bikedata$Temp_Range <- bikedata$Temp_High-bikedata$Temp_Low
+bikedata$Dew_Range <- bikedata$Dew_High-bikedata$Dew_Low
+bikedata$Hum_Range <- bikedata$Hum_High-bikedata$Hum_Low
+bikedata$Pres_Range <- bikedata$Pres_High-bikedata$Pres_Low
+bikedata$Vis_Range <- bikedata$Vis_High-bikedata$Vis_Low
+
+# Drop and High and Low variables. We will also drop Is.Weekend because it is perfectly linearly
+# depend with Weekday==Saturday and Weekday==Sunday.
+
+bikedata <- bikedata %>% 
+  select(-Is.Weekend, -Temp_High, -Temp_Low, -Dew_High, -Dew_Low, -Hum_High, -Hum_Low,
+         -Pres_High, -Pres_Low, -Vis_High, -Vis_Low)
+
+# Look at correlation matrix between numeric variables
+is.num <- sapply(bikedata, is.numeric)
+num.df <- bikedata[, is.num]
+cor(num.df)
+
+# No more correlations above > 0.9
+
+lm.full2 <- lm(Bike.Count~. ,data=bikedata)
+summary(lm.full2)
+
+# Residual standard error: 1174 on 63 degrees of freedom
+# Multiple R-squared:  0.872,	Adjusted R-squared:  0.8192 
+# F-statistic: 16.51 on 26 and 63 DF,  p-value: < 2.2e-16
+
+# Model is significant.
+# Our Adj-R^2 improved from 0.8092 to 0.8192.
+# Variables identified by the model as significant at the 5% significance level:
+# Month(Jan), Day, Temp_Avg, Wind_Avg, Rain_Inches, Snow, Weekday(Sunday), Is.Holiday.
+
+vif(lm.full2)
+# VIF values are much lower now. However, Temp_Avg, Dew_Avg, Hum_Avg, Vis_Avg have VIF > 10.
+# Vis_Range has VIF > 5 and < 10.
+# According to the correlation matrix, Hum_Avg and Temp_Avg are both correlated with Dew_Avg
+# by 0.85317738 and 0.80249561 respectively.
+
+# What happens if we drop Dew_Avg and Vis_Range?
+lm.full3 <- lm(Bike.Count~. -Dew_Avg -Vis_Range,data=bikedata)
 summary(lm.full3)
-lm.step2<-step(lm.null, scope=list(lower=lm.null, upper=lm.full3), direction="both")
-# Step:  AIC=1278.24
-# Bike.Count ~ Temp_Avg + Rain_Inches + Month + Rain + Weekday + 
-#   Day + Is.Holiday + Wind_Avg + Snow + Vis_Low - 1
-summary(lm.step2)
-# Coefficients:
-#   Estimate Std. Error t value Pr(>|t|)    
-# Temp_Avg           189.57      14.99  12.646  < 2e-16 ***
-#   Rain_Inches      -3897.44     832.03  -4.684 1.27e-05 ***
-#   MonthFeb         -1034.73     986.17  -1.049 0.297529    
-# MonthJan         -1797.95     880.97  -2.041 0.044880 *  
-#   MonthMarch        -590.28     988.71  -0.597 0.552341    
-# Rain              -533.19     338.49  -1.575 0.119532    
-# WeekdayMonday      220.51     453.86   0.486 0.628525    
-# WeekdaySaturday   -265.18     461.09  -0.575 0.566978    
-# WeekdaySunday    -1687.49     449.79  -3.752 0.000349 ***
-#   WeekdayThursday   -112.93     451.04  -0.250 0.803001    
-# WeekdayTuesday    -195.96     465.26  -0.421 0.674856    
-# WeekdayWednesday  -155.20     468.08  -0.332 0.741175    
-# Day                 31.66      14.80   2.138 0.035836 *  
-#   Is.Holiday       -1798.76     672.32  -2.675 0.009207 ** 
-#   Wind_Avg           -88.44      31.73  -2.787 0.006772 ** 
-#   Snow              1010.29     437.79   2.308 0.023852 *  
-#   Vis_Low            110.37      48.85   2.259 0.026859 *  
-#   ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# Snow is no longer significant.
+
+# Residual standard error: 1179 on 65 degrees of freedom
+# Multiple R-squared:  0.8669,	Adjusted R-squared:  0.8178 
+# F-statistic: 17.65 on 24 and 65 DF,  p-value: < 2.2e-16
+
+# Model is significant.
+vif(lm.full3)
+# Vis_Avg and Hum_Avg have GVIF ~ 5 or 6, but overall, looks much better.
+
+# Drop Dew_Avg and Vis_Range from dataframe.
+
+bikedata <- bikedata %>% 
+  select(-Dew_Avg, -Vis_Range)
+
+lm.full4 <- lm(Bike.Count~.,data=bikedata)
+
+# Step function -----------------------------------------------------------------
+
+## Begin by defining the models with no variables (null) and all variables (full)
+lm.null <- lm(Bike.Count~1,data=bikedata)
+
+## step selection
+lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full4), direction="both")
+
+# Step:  AIC=1281.19
+# Bike.Count ~ Temp_Avg + Hum_Avg + Rain_Inches + Weekday + Is.Holiday + 
+#   Wind_Avg + Month + Day + Snow + Rain
+
+summary(lm.step)
+# Residual standard error: 1134 on 73 degrees of freedom
+# Multiple R-squared:  0.8617,	Adjusted R-squared:  0.8314 
+# F-statistic: 28.43 on 16 and 73 DF,  p-value: < 2.2e-16
+
+# Model is significant.
+
+# Residual Analysis/Influential Points ----------------------------------------------
+
+## R-student residuals
+ti<-rstudent(lm.step)
+
+## Normal probabilty plot
+qqnorm(ti)
+qqline(ti)
+# Looks normal except for two points on the right tail.
+
+## Residual vs. fitted values plot
+plot(fitted(lm.step),ti)
+# Seems normal with the exception of 2 points.
+
+summary(influence.measures(lm.step))
+# Pt 84 is an influential point, with a COVRATIO of 0.07, a DFFIT of 1.94 and a DFBETA of 1.03 for Temp_Avg.
+# This suggests that point 84 has unusually high influence over the beta estimate of Temp_Avg,
+# and that the fitted values are being affected by the presence of point 84.
+
+# Pt 50 has a DFFIT of 1.56 and a COVRATIO of 0.1, suggesting that this point also exerts an unusual amount of
+# influence on the fitted values.
+
+bikedata[c(50, 84),]
+# These points correspond to Feb 19, 2017 and Mar 25, 2017.
+# Bike.Count Month Day Temp_Avg Hum_Avg Pres_Avg Vis_Avg Wind_Avg Rain_Inches Rain Fog Snow Thunderstorm  Weekday Is.Holiday
+# 50      12350   Feb  19       60      60    29.91      10        9        0.01    1   0    0            0   Sunday          0
+# 84      16191 March  25       66      58    30.17      10        9        0.00    0   0    0            0 Saturday          0
+
+summary(bikedata$Bike.Count)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 1583    5382    7237    7183    8608   16190
+
+# In terms of bike count, both these days are in the topmost quartile and the bike count for Pt 84 corresponds
+# to the max bike count.
+
+# Does removing these two points change the model's beta coefficients?
+lm.full5 <- lm(Bike.Count ~ Temp_Avg + Hum_Avg + Rain_Inches + 
+                 Weekday + Is.Holiday + Wind_Avg + Month + Day + Snow + Rain, 
+               data = bikedata[-c(50, 84),])
+summary(lm.full5)
+
+# Residual standard error: 946.7 on 71 degrees of freedom
+# Multiple R-squared:  0.8881,	Adjusted R-squared:  0.8629 
+# F-statistic: 35.22 on 16 and 71 DF,  p-value: < 2.2e-16
+
+# An improvement in Adjusted R^2 compared to lm.step (up from 0.8314).
+
+lm.full5$coefficients
+# (Intercept)         Temp_Avg          Hum_Avg      Rain_Inches    WeekdayMonday  WeekdaySaturday    WeekdaySunday 
+# 1540.024182       174.092476       -13.834248     -4194.415747       146.885718      -801.287525     -2075.045727 
+# WeekdayThursday   WeekdayTuesday WeekdayWednesday       Is.Holiday         Wind_Avg         MonthJan       MonthMarch 
+# 12.829004        -7.907761       -92.695427     -1789.780420       -92.307566      -850.845000       324.486204 
+# Day            Snow1            Rain1 
+# 30.187008       491.145747      -547.949283 
+
+lm.step$coefficients
+# (Intercept)         Temp_Avg          Hum_Avg      Rain_Inches    WeekdayMonday  WeekdaySaturday    WeekdaySunday 
+# 742.37329        199.83904        -20.72061      -4095.33739        193.89938       -387.05692      -1709.29852 
+# WeekdayThursday   WeekdayTuesday WeekdayWednesday       Is.Holiday         Wind_Avg         MonthJan       MonthMarch 
+# -86.16931        -40.64184       -198.33614      -1733.17718        -93.83794       -813.51719        321.05561 
+# Day            Snow1            Rain1 
+# 31.76259        679.38475       -570.10086 
+
+# Yes, there are large differences in these coefficient estimates.
+
+# However, we cannot justify removing these points in our model. An internet search reveals that
+# nothing special happened on Feb 19, 2017 or Mar 25, 2017 in Washington D.C. We have no evidence that
+# these two observations are bad data points. It's possible that they seem influential in this model
+# because we do not have enough data points (n = 90).
+
+# Plotting residuals against explanatory variables.
+
+plot(bikedata$Temp_Avg, ti) # Looks ok except the two points in the upper right hand corner.
+plot(bikedata$Hum_Avg, ti) # Looks fine except for two points
+plot(bikedata$Rain_Inches, ti) # Highly abnormal residuals - !!!!!
+plot(bikedata$Wind_Avg, ti) # Some irregularities, but mostly ok
+
+# Looking At Rain_Inches ----------------------------------------------- 
+
+plot(bikedata$Rain_Inches, bikedata$Bike.Count)
+# There are many days where Rain_Inches == 0, leading to the strange residual plot found above.
+
+# There seems to be no good way to transform this variable. Furthermore, it is
+# a significant variable, so we will leave it in as is.
+
+# Cross-Validate -----------------------------------------------
+x.cv <- cv.lm(data=bikedata, form.lm=lm.step, m=2, plotit=T)
+
+# Sum of squares = 1.21e+08    Mean square = 2698332    n = 45 
 # 
-# Residual standard error: 1116 on 73 degrees of freedom
-# Multiple R-squared:  0.9829,	Adjusted R-squared:  0.979 
-# F-statistic: 247.3 on 17 and 73 DF,  p-value: < 2.2e-16
-vif(lm.step2) #temp_avg: 5.993089
-              #not remove since high pvalue
-# > vif(lm.step2)
-#                 GVIF Df GVIF^(1/(2*Df))
-# Temp_Avg    35.917120  1        5.993089
-# Rain_Inches  2.018002  1        1.420564
-# Month       82.648773  3        2.087081
-# Rain         3.406187  1        1.845586
-# Weekday     14.411328  6        1.248989
-# Day          5.026538  1        2.241994
-# Is.Holiday   1.452777  1        1.205312
-# Wind_Avg     8.890154  1        2.981636
-# Snow         1.847969  1        1.359400
-# Vis_Low     11.789934  1        3.433647
-
-# step without month ----------------------------------------------------
-# since month has a high gvif
-lm.full4<-lm(Bike.Count~.-Temp_High - Hum_Avg - Pres_Avg - Month ,data=data)
-lm.step3<-step(lm.null, scope=list(lower=lm.null, upper=lm.full4), direction="both")
-# Step:  AIC=1277.08
-# Bike.Count ~ Temp_Avg + trans_rain + Weekday + Is.Holiday + Day + 
-#   Pres_Low + Temp_Low + Snow + Wind_Avg + Hum_High + Vis_Low - 
-#   1
-
-summary(lm.step3)
-# Coefficients:
-#   Estimate Std. Error t value Pr(>|t|)    
-# Temp_Avg            296.79      38.89   7.631 6.94e-11 ***
-#   trans_rain        -3181.63     700.55  -4.542 2.16e-05 ***
-#   WeekdayFriday    -28529.82   16507.13  -1.728  0.08816 .  
-# WeekdayMonday    -28235.98   16558.93  -1.705  0.09241 .  
-# WeekdaySaturday  -28775.91   16519.77  -1.742  0.08574 .  
-# WeekdaySunday    -30103.22   16515.49  -1.823  0.07244 .  
-# WeekdayThursday  -28594.69   16476.23  -1.736  0.08687 .  
-# WeekdayTuesday   -28788.95   16447.45  -1.750  0.08426 .  
-# WeekdayWednesday -28533.31   16436.83  -1.736  0.08679 .  
-# Is.Holiday        -1975.07     653.60  -3.022  0.00346 ** 
-#   Day                  33.53      14.90   2.251  0.02739 *  
-#   Pres_Low            904.57     539.08   1.678  0.09763 .  
-# Temp_Low            -83.53      44.92  -1.860  0.06696 .  
-# Snow               1386.15     445.15   3.114  0.00264 ** 
-#   Wind_Avg            -79.71      33.67  -2.367  0.02058 *  
-#   Hum_High            -19.15      11.37  -1.685  0.09631 .  
-# Vis_Low              68.88      52.43   1.314  0.19306    
-# ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# Residual standard error: 1108 on 73 degrees of freedom
-# Multiple R-squared:  0.9832,	Adjusted R-squared:  0.9792 
-# F-statistic: 250.6 on 17 and 73 DF,  p-value: < 2.2e-16
-
-# residuals analysis ----------------------------------------------
-## Find the residuals
-ei<-resid(lm.step3)
-
-## Find the studentized residuals
-ri<-rstandard(lm.step3)
-
-## Find the R-student residuals
-ti<-rstudent(lm.step3)
-
-## Normal probabilty plot : most points look normal. there are two exception
-qqnorm(rstudent(lm.step3))
-qqline(rstudent(lm.step3))
-
-## Residual plot vs. fitted values : most points look normal.  there are two exception
-yhat <- fitted(lm.step3)
-plot(yhat,ti)
-
-summary(influence.measures(lm.step3))
-#84 is an influential points.
-
-## plot against individual explainatory variable
-# Bike.Count ~ Temp_Avg + Rain_Inches + Month + Rain + Weekday + 
-#   Day + Is.Holiday + Wind_Avg + Snow + Vis_Low - 1
-plot(data$Temp_Avg,ti) #mostly normal beside two pts
-plot(data$Rain_Inches,ti) #not normal!
-plot(data$Wind_Avg,ti) #kind of normal 
-plot(data$Vis_Low,ti) #kind of normal 
-
-#box-cox
-boxcox(lm.step2)$lambda  #center around -0.75
-
-# transform variable ----------------------------------------------- 
-data$trans_rain<-data$Rain_Inches^0.5
-lm.4<-lm(Bike.Count ~ Temp_Avg + trans_rain + Rain + Weekday + 
-     Day + Is.Holiday + Wind_Avg + Snow + Vis_Low ,data=data)
-summary(lm.4) 
-#Adjusted R-squared:  0.8202  
-#trans_rain       trans_rain       -3541.99     797.56  -4.441 3.03e-05 ***
-ti<-rstudent(lm.4)
-plot(data$Rain_Inches,ti) #still not normal
-
-
-# cross validate -----------------------------------------------
-s.cv <- cv.lm(data=data, form.lm=lm.step3, m=2, plotit=T) 
-# Sum of squares = 96930568    Mean square = 2154013    n = 45 
 # Overall (Sum over all 45 folds) 
-# ms 2033546 
+# ms 
+# 2352489 
 
-# plot shows our final model (lm.step3) is pretty good.
+# Plot shows our final model is pretty good.
 
+#######################################################
+## LINEAR MODELING: PREDICTING TOTAL TRAVEL DISTANCE
+#######################################################
 
-##################################
-#  Predict total travel distance #
-##################################
-outcomeName<-"Total.Dist" 
-predictorName<-names(day)[8:33]
-data=data.frame(day[,predictorName],day[,outcomeName])
-names(data)[27]<-outcomeName
+bikedata2 <- bikedata %>% select(-Bike.Count)
+bikedata2$Total.Dist <- day$Total.Dist
 
 # Linear Model (full) ----------------------------------------------------
-lm.full<-lm(Total.Dist~.,data=data)
+
+lm.full<-lm(Total.Dist~.,data=bikedata2)
 summary(lm.full) 
-# Call:
-#   lm(formula = Total.Dist ~ ., data = data)
-# 
-# Residuals:
-#   Min       1Q   Median       3Q      Max 
-# -4142751 -1420799  -275112  1264260  7387941 
-# 
-# Coefficients: (2 not defined because of singularities)
-# Estimate Std. Error t value Pr(>|t|)   
-# (Intercept)      -32786519   49368100   -0.66   0.5092   
-# MonthJan          -1477401     904751   -1.63   0.1078   
-# MonthMarch          326644     923584    0.35   0.7248   
-# Day                  76872      40983    1.88   0.0656 . 
-# Temp_High            71919     593249    0.12   0.9039   
-# Temp_Avg            402676    1200287    0.34   0.7385   
-# Temp_Low              1236     608885    0.00   0.9984   
-# Dew_High              3301     133736    0.02   0.9804   
-# Dew_Avg            -110198     196993   -0.56   0.5780   
-# Dew_Low              61578     119715    0.51   0.6089   
-# Hum_High            -70601      87740   -0.80   0.4242   
-# Hum_Avg             112558     155900    0.72   0.4732   
-# Hum_Low             -30562      71239   -0.43   0.6695   
-# Pres_High          1899766    8195961    0.23   0.8175   
-# Pres_Avg          -2318561   14876266   -0.16   0.8767   
-# Pres_Low           1328079    8604694    0.15   0.8779   
-# Vis_High                NA         NA      NA       NA   
-# Vis_Avg             -31776     618062   -0.05   0.9592   
-# Vis_Low             267522     223886    1.19   0.2369   
-# Wind_Avg           -199183      87521   -2.28   0.0265 * 
-#   Rain_Inches       -7754751    2604341   -2.98   0.0042 **
-#   Rain               -820842    1022358   -0.80   0.4253   
-# Fog                 715457    1663492    0.43   0.6687   
-# Snow               3046881    1336248    2.28   0.0262 * 
-#   Thunderstorm        165294    2978387    0.06   0.9559   
-# WeekdayMonday       702456    1204993    0.58   0.5621   
-# WeekdaySaturday    -267159    1204318   -0.22   0.8252   
-# WeekdaySunday     -3888304    1132643   -3.43   0.0011 **
-#   WeekdayThursday    -117794    1164422   -0.10   0.9198   
-# WeekdayTuesday     -601175    1201452   -0.50   0.6187   
-# WeekdayWednesday     97222    1217645    0.08   0.9366   
-# Is.Weekend              NA         NA      NA       NA   
-# Is.Holiday        -4428662    1716542   -2.58   0.0124 * 
-#   ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# Residual standard error: 2630000 on 59 degrees of freedom
-# Multiple R-squared:  0.872,	Adjusted R-squared:  0.807 
-# F-statistic: 13.4 on 30 and 59 DF,  p-value: <2e-16
 
-#remove is.weekend and Vis_High
-predictorName<-predictorName[-c(15,25)]
-data=data.frame(day[,predictorName],day[,outcomeName])
-names(data)[25]<-outcomeName
+# Residual standard error: 2590000 on 64 degrees of freedom
+# Multiple R-squared:  0.866,	Adjusted R-squared:  0.813 
+# F-statistic: 16.5 on 25 and 64 DF,  p-value: <2e-16
 
-lm.full2<-lm(Total.Dist~.,data=data)
-summary(lm.full2) 
-
-lm.full3<-lm(Total.Dist~.-Month,data=data)
-summary(lm.full2) 
+# Model is significant.
+# Month, Day, Temp_Avg, Wind_Avg, Rain_Inches, Snow, Weekday, Is.Holiday 
+# appear to be statistically significant predictors.
 
 # Step function -----------------------------------------------------------------
 ## Begin by defining the models with no variables (null) and all variables (full)
-lm.null <- lm(Total.Dist~0,data=data)
+lm.null <- lm(Total.Dist~1,data=bikedata2)
 
-#### step selection 1
-lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full3), direction="both")
-#Step:  AIC=2665
-# Total.Dist ~ Rain_Inches + Weekday + Is.Holiday + Day + Vis_Low + 
-#   Wind_Avg + Snow + Temp_Avg + Hum_High - 1
+#### step selection
+lm.step<-step(lm.null, scope=list(lower=lm.null, upper=lm.full), direction="both")
+# Step:  AIC=2664
+# Total.Dist ~ Temp_Avg + Rain_Inches + Weekday + Is.Holiday + 
+#   Wind_Avg + Day + Month + Snow + Rain
 
-vif(lm.step) #there are some high vif
+summary(lm.step)
+# Residual standard error: 2470000 on 74 degrees of freedom
+# Multiple R-squared:  0.859,	Adjusted R-squared:  0.83 
+# F-statistic:   30 on 15 and 74 DF,  p-value: <2e-16
 
-#### step selection 2
-# step without high vif variables
-lm.full4<-lm(Total.Dist~.-Month-Hum_High,data=data)
-lm.step2<-step(lm.null, scope=list(lower=lm.null, upper=lm.full4), direction="both")
-# Step:  AIC=2665
-# Total.Dist ~ Rain_Inches + Weekday + Is.Holiday + Day + Vis_Low + 
-#   Wind_Avg + Snow + Temp_Avg + Dew_High - 1
+vif(lm.step)
+# All VIF < 2.
 
-vif(lm.step2) #temp avg is very high
-
-#### step selection 3
-lm.step3<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_Avg,data=data)
-                                   ), direction="both")
-
-vif(lm.step3) #temp low and dew high are very high
-
-#### step selection 4
-lm.step4<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_Avg-Temp_Low-Dew_High,data=data)
-                ), direction="both")
-vif(lm.step4) #temp_high is very high
-
-
-#### step selection 5
-lm.step5<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Temp_High-Temp_Avg-Temp_Low-Dew_High,data=data)
-), direction="both")
-vif(lm.step5) 
-
-#### step selection 6
-lm.step6<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Temp_High-Temp_Avg-Temp_Low-Dew_High,data=data)
-), direction="both")
-vif(lm.step6) 
-
-#### step selection 7
-lm.step7<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg,data=data)
-), direction="both")
-vif(lm.step7) 
-
-#### step selection 8
-lm.step8<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg,data=data)
-), direction="both")
-vif(lm.step8) 
-
-#### step selection 9
-lm.step9<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg-Vis_Avg,data=data)
-), direction="both")
-vif(lm.step9) 
-
-#### step selection 10
-lm.step10<-step(lm.null, scope=list(lower=lm.null, 
-                                   upper=lm(Total.Dist~.-Month-Hum_High-Hum_Avg-Hum_Low-Temp_High-Temp_Avg-Temp_Low-Dew_High-Dew_Avg-Vis_Avg-Vis_Low,data=data)
-), direction="both")
-#Total.Dist ~ Weekday + Dew_Low + Rain_Inches + Is.Holiday + Day - 1
-  
-vif(lm.step10)  #all below 5
-
-# residuals analysis ----------------------------------------------
-## Find the residuals
-ei<-resid(lm.step10)
-
-## Find the studentized residuals
-ri<-rstandard(lm.step10)
+# Residual Analysis ----------------------------------------------
 
 ## Find the R-student residuals
-ti<-rstudent(lm.step10)
+ti<-rstudent(lm.step)
 
-## Normal probabilty plot : most points look normal. except right tail
-qqnorm(rstudent(lm.step10))
-qqline(rstudent(lm.step10))
+## Normal probabilty plot
+qqnorm(ti)
+qqline(ti)
+# Looks good apart from 2 points in the right tail.
 
-## Residual plot vs. fitted values : most points look normal.  there are 2 exception
-yhat <- fitted(lm.step10)
-plot(yhat,ti)
+## Residual plot vs. fitted values
+plot(fitted(lm.step), ti)
+# Mostly fine except for 2 outliers.
 
-summary(influence.measures(lm.step10))
-#84,51 & 90 are an influential points.
+## Plot against individual explanatory variable
+plot(bikedata2$Temp_Avg, ti)
+plot(bikedata2$Rain_Inches, ti)
+plot(bikedata2$Wind_Avg, ti)
 
-## plot against individual explainatory variable
-#Total.Dist ~ Weekday + Dew_Low + Rain_Inches + Is.Holiday + Day 
-plot(data$Dew_Low,ti) #mostly normal
-plot(data$Rain_Inches,ti) #not normal!
-plot(data$Day,ti) #kind of normal 
+# The plots are all similar to the ones in the Bike.Count model.
 
-# cross validate -----------------------------------------------
-s.cv <- cv.lm(data=data, form.lm=lm.step10, m=2, plotit=T) 
-#Sum of squares = 1.08e+15    Mean square = 2.4e+13    n = 45 
+# Cross-Validate -----------------------------------------------
+s.cv <- cv.lm(data=bikedata2, form.lm=lm.step, m=2, plotit=T) 
+
+# Sum of squares = 5.72e+14    Mean square = 1.27e+13    n = 45 
+# 
 # Overall (Sum over all 45 folds) 
-# ms  1.82e+13 
-
-# plot shows our final model (lm.step3) is  good.
+# ms 
+# 1.1e+13
