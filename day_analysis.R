@@ -313,3 +313,35 @@ plot(fitted(hour.lm),hour.ti)
 
 plot(as.numeric(by_hour$Start.Hour), by_hour$Predicted.Residual)
 
+## polynomial 
+by_hour$Start.Hour<-as.numeric(by_hour$Start.Hour)
+for (i in c(exp(1),1:10)){
+hour.lm.n <- lm(Predicted.Residual ~ poly(Start.Hour,i), data=by_hour)
+print(paste("i: ",i))
+print(paste("r.squared: ",summary(hour.lm.n)$r.squared))
+}
+
+
+
+# [1] "i:  1"
+# [1] "r.squared:  0.107612701237565"
+# [1] "i:  2"
+# [1] "r.squared:  0.358878782045627"
+# [1] "i:  2.71828182845905"
+# [1] "r.squared:  0.358878782045627"
+# [1] "i:  3"
+# [1] "r.squared:  0.427634603544068"
+# [1] "i:  4"
+# [1] "r.squared:  0.427796302964034"
+# [1] "i:  5"
+# [1] "r.squared:  0.431068009612039"
+# [1] "i:  6"
+# [1] "r.squared:  0.482216200704182"
+# [1] "i:  7"
+# [1] "r.squared:  0.517578873090201"
+# [1] "i:  8"
+# [1] "r.squared:  0.552582585118866"
+# [1] "i:  9"
+# [1] "r.squared:  0.566206272061443"
+# [1] "i:  10"
+# [1] "r.squared:  0.567498518111798"
