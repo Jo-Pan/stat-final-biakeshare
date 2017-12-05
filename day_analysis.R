@@ -2,6 +2,7 @@ library(MASS) #box-cox
 library(DAAG) #cv
 library(car) #step
 library(tidyverse)
+library(ggplot2)
 
 ###########################################
 ## LINEAR MODELING: PREDICTING BIKE COUNT
@@ -262,6 +263,11 @@ x.cv <- cv.lm(data=bikedata, form.lm=lm.step, m=2, plotit=T)
 
 # Plot shows our final model is pretty good.
 
+# PRESS statistic
+pr <- resid(lm.step)/(1-lm.influence(lm.step)$hat)
+sum(pr^2)
+# PRESS = 1.44e+08
+
 #######################################################
 ## LINEAR MODELING: PREDICTING DAILY TOTAL DISTANCE
 #######################################################
@@ -276,13 +282,13 @@ plot(day$Bike.Count, day$Total.Dist)
 ## LINEAR MODELING: PREDICTING HOURLY BIKE COUNT
 #######################################################
 
+## data preprocess
 by_hour <- hour %>% 
   group_by(Date, Start.Hour) %>% 
   summarise(Bike.Count = n())
 
 by_hour$Start.Hour <- as.factor(by_hour$Start.Hour)
 
-plot(by_hour$Start.Hour, by_hour$Bike.Count)
 
 predicted <- data.frame(Date = day$Date, Predicted.BC = fitted(lm.step)/24)
 
@@ -290,6 +296,15 @@ by_hour <- merge(x = by_hour, y = predicted, by = "Date", all.x=TRUE)
 
 by_hour$Predicted.Residual <- by_hour$Bike.Count - by_hour$Predicted.BC
 
+## Plot
+ggplot(by_hour, aes_string(x="Start.Hour", y="Predicted.Residual")) +
+  geom_point(position=position_jitter(w=0.0, h=0.4)) +
+  theme_light(base_size=20) +
+  xlab("Hour of the Day") +
+  ylab("Predicted Residual") +
+  theme(plot.title=element_text(size=18))
+
+## lm
 hour.lm <- lm(Predicted.Residual ~ Start.Hour, data=by_hour)
 summary(hour.lm)
 
